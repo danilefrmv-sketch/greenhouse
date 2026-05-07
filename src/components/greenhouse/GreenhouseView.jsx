@@ -506,6 +506,15 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
     return (
       <div className="select-none pb-6">
 
+        {/* DEBUG — удалить после теста */}
+        <div className="fixed top-16 left-2 right-2 z-[300] bg-black/80 text-white text-xs rounded-xl p-2 pointer-events-none">
+          <div>active: {String(touchDrag.active)}</div>
+          <div>source: {touchDrag.source ? `bed${touchDrag.source.bedIndex} r${touchDrag.source.row}c${touchDrag.source.col}` : 'null'}</div>
+          <div>target: {touchDrag.target ? `bed${touchDrag.target.bedIndex} r${touchDrag.target.row}c${touchDrag.target.col}` : 'null'}</div>
+          <div>xy: {Math.round(touchDrag.x)},{Math.round(touchDrag.y)}</div>
+          <div>ref attached: {String(!!sliderContainerRef.current)}</div>
+        </div>
+
         {/* Индикатор грядок (точки или pills) */}
         {numBeds > 1 && (
           <div className="flex mb-4 bg-gray-100 rounded-2xl p-1 gap-1">
