@@ -362,23 +362,13 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
   // Refs для пропов — нужны внутри нативных обработчиков (stable closure)
   const numBedsRef     = useRef(numBeds)
   const onPlantMoveRef = useRef(onPlantMove)
+  const plantsRef      = useRef(plants)
   useEffect(() => { numBedsRef.current     = numBeds    }, [numBeds])
   useEffect(() => { onPlantMoveRef.current = onPlantMove }, [onPlantMove])
+  useEffect(() => { plantsRef.current      = plants      }, [plants])
 
-  // Long-press запускается с ячейки растения
-  const handleTouchCellStart = useCallback((e, cell, plant) => {
-    if (!plant) return
-    const touch = e.touches[0]
-    clearTimeout(longPressTimer.current)
-    longPressTimer.current = setTimeout(() => {
-      navigator.vibrate?.(60)
-      const next = { active: true, source: cell, target: null, x: touch.clientX, y: touch.clientY, plant }
-      touchDragRef.current = next
-      setTouchDrag({ ...next })
-    }, 450)
-    swipeRef.current = { dragging: true, startX: touch.clientX, startY: touch.clientY, offset: 0, moved: false }
-    setSwipeOffset(0)
-  }, [])
+  // Заглушка — long-press теперь полностью в нативном обработчике
+  const handleTouchCellStart = useCallback(() => {}, [])
 
   // ── Все нативные touch-обработчики в одном эффекте (нет stale closures) ──
   const sliderContainerRef = useRef(null)
@@ -389,14 +379,12 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
 
     // Поиск ячейки под пальцем — два метода для надёжности
     const findCell = (x, y) => {
-      // elementsFromPoint возвращает все элементы в точке, включая перекрытые
       const stack = document.elementsFromPoint?.(x, y) ?? []
       for (const node of stack) {
         if (node.dataset?.bed !== undefined) return node
         const p = node.closest?.('[data-bed]')
         if (p) return p
       }
-      // Запасной вариант: перебор всех ячеек через bounding rect
       for (const c of document.querySelectorAll('[data-bed]')) {
         const r = c.getBoundingClientRect()
         if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return c
@@ -408,6 +396,26 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
       const t = e.touches[0]
       swipeRef.current = { dragging: true, startX: t.clientX, startY: t.clientY, offset: 0, moved: false }
       setSwipeOffset(0)
+
+      // Long-press нативно — не зависим от React synthetic events
+      const cellEl = findCell(t.clientX, t.clientY)
+      if (cellEl) {
+        const bed = +cellEl.dataset.bed
+        const row = +cellEl.dataset.row
+        const col = +cellEl.dataset.col
+        const plant = plantsRef.current.find(
+          p => p.bedIndex === bed && p.row === row && p.col === col
+        )
+        if (plant) {
+          clearTimeout(longPressTimer.current)
+          longPressTimer.current = setTimeout(() => {
+            navigator.vibrate?.(60)
+            const next = { active: true, source: { bedIndex: bed, row, col }, target: null, x: t.clientX, y: t.clientY, plant }
+            touchDragRef.current = next
+            setTouchDrag({ ...next })
+          }, 450)
+        }
+      }
     }
 
     const onMove = (e) => {
