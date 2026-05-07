@@ -358,6 +358,7 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
   const touchDragRef   = useRef({ active: false, source: null, target: null, x: 0, y: 0, plant: null })
   const [touchDrag, setTouchDrag] = useState(touchDragRef.current)
   const longPressTimer = useRef(null)
+  const prevTargetEl   = useRef(null)   // DOM-элемент подсвеченной ячейки-цели
 
   // Refs для пропов — нужны внутри нативных обработчиков (stable closure)
   const numBedsRef     = useRef(numBeds)
@@ -425,6 +426,28 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
       if (touchDragRef.current.active) {
         // ── Режим переноса ────────────────────────────────────
         const cellEl = findCell(t.clientX, t.clientY)
+
+        // ── Прямое DOM-выделение цели (не ждём React-рендера) ──
+        if (prevTargetEl.current && prevTargetEl.current !== cellEl) {
+          const inner = prevTargetEl.current.firstElementChild
+          if (inner) { inner.style.outline = ''; inner.style.background = '' }
+          prevTargetEl.current = null
+        }
+        if (cellEl) {
+          const bed = +cellEl.dataset.bed, row = +cellEl.dataset.row, col = +cellEl.dataset.col
+          const src = touchDragRef.current.source
+          const isSelf = src && src.bedIndex === bed && src.row === row && src.col === col
+          if (!isSelf) {
+            const hasPlant = !!plantsRef.current.find(p => p.bedIndex === bed && p.row === row && p.col === col)
+            const inner = cellEl.firstElementChild
+            if (inner) {
+              inner.style.outline = hasPlant ? '2px solid #f59e0b' : '2px solid #22c55e'
+              inner.style.background = hasPlant ? '#fffbeb' : '#dcfce7'
+            }
+            prevTargetEl.current = cellEl
+          }
+        }
+
         const target = cellEl
           ? { bedIndex: +cellEl.dataset.bed, row: +cellEl.dataset.row, col: +cellEl.dataset.col }
           : touchDragRef.current.target
@@ -439,6 +462,11 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
         if (atLeft) {
           setEdgeZone('left')
           if (!edgeTimerRef.current) edgeTimerRef.current = setTimeout(() => {
+            if (prevTargetEl.current) {
+              const inner = prevTargetEl.current.firstElementChild
+              if (inner) { inner.style.outline = ''; inner.style.background = '' }
+              prevTargetEl.current = null
+            }
             const next = activeBedRef.current - 1
             activeBedRef.current = next; setActiveBed(next)
             touchDragRef.current = { ...touchDragRef.current, target: null }
@@ -448,6 +476,11 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
         } else if (atRight) {
           setEdgeZone('right')
           if (!edgeTimerRef.current) edgeTimerRef.current = setTimeout(() => {
+            if (prevTargetEl.current) {
+              const inner = prevTargetEl.current.firstElementChild
+              if (inner) { inner.style.outline = ''; inner.style.background = '' }
+              prevTargetEl.current = null
+            }
             const next = activeBedRef.current + 1
             activeBedRef.current = next; setActiveBed(next)
             touchDragRef.current = { ...touchDragRef.current, target: null }
@@ -477,6 +510,13 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
       clearTimeout(longPressTimer.current)
       clearTimeout(edgeTimerRef.current)
       edgeTimerRef.current = null; setEdgeZone(null)
+
+      // Снять DOM-подсветку цели
+      if (prevTargetEl.current) {
+        const inner = prevTargetEl.current.firstElementChild
+        if (inner) { inner.style.outline = ''; inner.style.background = '' }
+        prevTargetEl.current = null
+      }
 
       const drag = touchDragRef.current
       if (drag.active) {
@@ -513,15 +553,6 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
   if (isMobile) {
     return (
       <div className="select-none pb-6">
-
-        {/* DEBUG — удалить после теста */}
-        <div className="fixed top-16 left-2 right-2 z-[300] bg-black/80 text-white text-xs rounded-xl p-2 pointer-events-none">
-          <div>active: {String(touchDrag.active)}</div>
-          <div>source: {touchDrag.source ? `bed${touchDrag.source.bedIndex} r${touchDrag.source.row}c${touchDrag.source.col}` : 'null'}</div>
-          <div>target: {touchDrag.target ? `bed${touchDrag.target.bedIndex} r${touchDrag.target.row}c${touchDrag.target.col}` : 'null'}</div>
-          <div>xy: {Math.round(touchDrag.x)},{Math.round(touchDrag.y)}</div>
-          <div>ref attached: {String(!!sliderContainerRef.current)}</div>
-        </div>
 
         {/* Индикатор грядок (точки или pills) */}
         {numBeds > 1 && (
