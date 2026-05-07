@@ -483,6 +483,26 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
     setSwipeOffset(0)
   }, [])
 
+  // ── Non-passive touch listeners (нужно для e.preventDefault() на Android) ──
+  const sliderContainerRef = useRef(null)
+  const touchStartCbRef    = useRef(handleContainerTouchStart)
+  const touchMoveCbRef     = useRef(handleContainerTouchMove)
+  useEffect(() => { touchStartCbRef.current = handleContainerTouchStart }, [handleContainerTouchStart])
+  useEffect(() => { touchMoveCbRef.current  = handleContainerTouchMove  }, [handleContainerTouchMove])
+
+  useEffect(() => {
+    const el = sliderContainerRef.current
+    if (!el) return
+    const onStart  = e => touchStartCbRef.current(e)
+    const onMove   = e => { e.preventDefault(); touchMoveCbRef.current(e) }
+    el.addEventListener('touchstart', onStart, { passive: false })
+    el.addEventListener('touchmove',  onMove,  { passive: false })
+    return () => {
+      el.removeEventListener('touchstart', onStart)
+      el.removeEventListener('touchmove',  onMove)
+    }
+  }, [])
+
   // ── Мобильный вид: горизонтальный слайдер ────────────────────────
   if (isMobile) {
     return (
@@ -511,12 +531,12 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
 
         {/* Слайдер грядок */}
         <div
+          ref={sliderContainerRef}
           className="overflow-hidden"
           style={{ touchAction: 'none' }}
-          onTouchStart={handleContainerTouchStart}
-          onTouchMove={handleContainerTouchMove}
           onTouchEnd={handleContainerTouchEnd}
           onTouchCancel={handleContainerTouchCancel}
+          onContextMenu={e => e.preventDefault()}
         >
           <div
             className="flex"

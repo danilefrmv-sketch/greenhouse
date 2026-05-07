@@ -49,6 +49,7 @@ export default function PlantCell({
       onDragEnd={onDragEnd}
       onClick={onClick}
       onTouchStart={onTouchStart}
+      onContextMenu={e => e.preventDefault()}
     >
       {/* Пустая ячейка — плюс при наведении */}
       {isEmpty && !isDragTarget && (
