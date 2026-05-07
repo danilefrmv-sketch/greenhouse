@@ -38,6 +38,7 @@ export default function Drawer({
 }) {
   const isMobile  = useIsMobile()
   const [visible, setVisible] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
   // Visual viewport tracking — чтобы bottom sheet не перекрывался клавиатурой
   const [vvOffset, setVvOffset] = useState(0)
@@ -45,6 +46,7 @@ export default function Drawer({
 
   useEffect(() => {
     if (open) {
+      setMounted(true)
       document.body.style.overflow = 'hidden'
       const raf = requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true)))
       return () => cancelAnimationFrame(raf)
@@ -52,6 +54,9 @@ export default function Drawer({
       setVisible(false)
       document.body.style.overflow = ''
       setVvOffset(0)
+      // Размонтируем после завершения анимации закрытия — убираем инпуты из DOM
+      const t = setTimeout(() => setMounted(false), 420)
+      return () => clearTimeout(t)
     }
   }, [open])
 
@@ -109,6 +114,8 @@ export default function Drawer({
       </div>
     </div>
   )
+
+  if (!mounted) return null
 
   if (isMobile) {
     return createPortal(
