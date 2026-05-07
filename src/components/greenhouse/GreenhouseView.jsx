@@ -355,163 +355,151 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
   const handleDragEnd   = () => { setDragSource(null); setDragTarget(null) }
 
   // ── Touch drag state ──────────────────────────────────────────────
-  // touchDragRef — источник правды, обновляется СИНХРОННО
-  // touchDrag    — только для рендера
-  const DRAG_RESET = { active: false, source: null, target: null, x: 0, y: 0, plant: null }
-  const touchDragRef   = useRef(DRAG_RESET)
-  const [touchDrag, setTouchDrag] = useState(DRAG_RESET)
+  const touchDragRef   = useRef({ active: false, source: null, target: null, x: 0, y: 0, plant: null })
+  const [touchDrag, setTouchDrag] = useState(touchDragRef.current)
   const longPressTimer = useRef(null)
 
-  // Синхронное обновление ref + state
-  const setDrag = useCallback((next) => {
-    touchDragRef.current = next
-    setTouchDrag(next)
-  }, [])
+  // Refs для пропов — нужны внутри нативных обработчиков (stable closure)
+  const numBedsRef     = useRef(numBeds)
+  const onPlantMoveRef = useRef(onPlantMove)
+  useEffect(() => { numBedsRef.current     = numBeds    }, [numBeds])
+  useEffect(() => { onPlantMoveRef.current = onPlantMove }, [onPlantMove])
 
+  // Long-press запускается с ячейки растения
   const handleTouchCellStart = useCallback((e, cell, plant) => {
     if (!plant) return
     const touch = e.touches[0]
     clearTimeout(longPressTimer.current)
     longPressTimer.current = setTimeout(() => {
       navigator.vibrate?.(60)
-      setDrag({ active: true, source: cell, target: null, x: touch.clientX, y: touch.clientY, plant })
+      const next = { active: true, source: cell, target: null, x: touch.clientX, y: touch.clientY, plant }
+      touchDragRef.current = next
+      setTouchDrag({ ...next })
     }, 450)
-    swipeRef.current = { dragging: true, startX: touch.clientX, offset: 0 }
-    setSwipeOffset(0)
-  }, [setDrag])
-
-  const handleContainerTouchStart = useCallback(e => {
-    const touch = e.touches[0]
-    swipeRef.current = { dragging: true, startX: touch.clientX, offset: 0 }
+    swipeRef.current = { dragging: true, startX: touch.clientX, startY: touch.clientY, offset: 0, moved: false }
     setSwipeOffset(0)
   }, [])
 
-  const handleContainerTouchMove = useCallback(e => {
-    const touch = e.touches[0]
-
-    if (touchDragRef.current.active) {
-      // ── Режим переноса растения ──────────────────────────────
-      clearTimeout(longPressTimer.current)
-
-      // Ищем ячейку под пальцем
-      const el     = document.elementFromPoint(touch.clientX, touch.clientY)
-      const cellEl = el?.closest('[data-bed]')
-      const target = cellEl ? {
-        bedIndex: parseInt(cellEl.dataset.bed),
-        row:      parseInt(cellEl.dataset.row),
-        col:      parseInt(cellEl.dataset.col),
-      } : touchDragRef.current.target
-
-      // Синхронно обновляем ref и state
-      setDrag({ ...touchDragRef.current, x: touch.clientX, y: touch.clientY, target })
-
-      // Детекция края → смена грядки
-      const sw = window.innerWidth
-      const atLeft  = touch.clientX < EDGE_W && activeBedRef.current > 0
-      const atRight = touch.clientX > sw - EDGE_W && activeBedRef.current < numBeds - 1
-
-      if (atLeft) {
-        setEdgeZone('left')
-        if (!edgeTimerRef.current) {
-          edgeTimerRef.current = setTimeout(() => {
-            switchBed(activeBedRef.current - 1)
-            setDrag({ ...touchDragRef.current, target: null })
-            edgeTimerRef.current = null
-            setEdgeZone(null)
-          }, EDGE_DELAY)
-        }
-      } else if (atRight) {
-        setEdgeZone('right')
-        if (!edgeTimerRef.current) {
-          edgeTimerRef.current = setTimeout(() => {
-            switchBed(activeBedRef.current + 1)
-            setDrag({ ...touchDragRef.current, target: null })
-            edgeTimerRef.current = null
-            setEdgeZone(null)
-          }, EDGE_DELAY)
-        }
-      } else {
-        clearTimeout(edgeTimerRef.current)
-        edgeTimerRef.current = null
-        setEdgeZone(null)
-      }
-      return
-    }
-
-    // ── Режим свайпа между грядками ──────────────────────────
-    clearTimeout(longPressTimer.current)
-    if (!swipeRef.current.dragging) return
-    const offset = touch.clientX - swipeRef.current.startX
-    swipeRef.current.offset = offset
-    setSwipeOffset(offset)
-  }, [numBeds, switchBed, setDrag])
-
-  const handleContainerTouchEnd = useCallback(() => {
-    clearTimeout(longPressTimer.current)
-    clearTimeout(edgeTimerRef.current)
-    edgeTimerRef.current = null
-    setEdgeZone(null)
-
-    const drag = touchDragRef.current  // всегда актуален (синхронный)
-    if (drag.active) {
-      if (drag.source && drag.target) {
-        const { source, target } = drag
-        const isSelf = source.bedIndex === target.bedIndex && source.row === target.row && source.col === target.col
-        if (!isSelf) onPlantMove?.(source, target)
-      }
-      setDrag(DRAG_RESET)
-    } else {
-      const { offset } = swipeRef.current
-      if (offset < -SWIPE_THR && activeBedRef.current < numBeds - 1) {
-        switchBed(activeBedRef.current + 1)
-      } else if (offset > SWIPE_THR && activeBedRef.current > 0) {
-        switchBed(activeBedRef.current - 1)
-      }
-    }
-
-    swipeRef.current = { dragging: false, startX: 0, offset: 0 }
-    setSwipeOffset(0)
-  }, [onPlantMove, numBeds, switchBed, setDrag])
-
-  const handleContainerTouchCancel = useCallback(() => {
-    clearTimeout(longPressTimer.current)
-    clearTimeout(edgeTimerRef.current)
-    edgeTimerRef.current = null
-    setEdgeZone(null)
-    setDrag(DRAG_RESET)
-    swipeRef.current = { dragging: false, startX: 0, offset: 0 }
-    setSwipeOffset(0)
-  }, [setDrag])
-
-  // ── Все touch-события нативно (React synthetic не надёжны на MIUI/Android) ──
+  // ── Все нативные touch-обработчики в одном эффекте (нет stale closures) ──
   const sliderContainerRef = useRef(null)
-  const touchStartCbRef  = useRef(handleContainerTouchStart)
-  const touchMoveCbRef   = useRef(handleContainerTouchMove)
-  const touchEndCbRef    = useRef(handleContainerTouchEnd)
-  const touchCancelCbRef = useRef(handleContainerTouchCancel)
-  useEffect(() => { touchStartCbRef.current  = handleContainerTouchStart  }, [handleContainerTouchStart])
-  useEffect(() => { touchMoveCbRef.current   = handleContainerTouchMove   }, [handleContainerTouchMove])
-  useEffect(() => { touchEndCbRef.current    = handleContainerTouchEnd    }, [handleContainerTouchEnd])
-  useEffect(() => { touchCancelCbRef.current = handleContainerTouchCancel }, [handleContainerTouchCancel])
 
   useEffect(() => {
     const el = sliderContainerRef.current
     if (!el) return
-    const onStart  = e => touchStartCbRef.current(e)
-    const onMove   = e => { e.preventDefault(); touchMoveCbRef.current(e) }
-    const onEnd    = e => touchEndCbRef.current(e)
-    const onCancel = e => touchCancelCbRef.current(e)
-    el.addEventListener('touchstart',  onStart,  { passive: false })
-    el.addEventListener('touchmove',   onMove,   { passive: false })
-    el.addEventListener('touchend',    onEnd,    { passive: true  })
-    el.addEventListener('touchcancel', onCancel, { passive: true  })
+
+    // Поиск ячейки под пальцем — два метода для надёжности
+    const findCell = (x, y) => {
+      // elementsFromPoint возвращает все элементы в точке, включая перекрытые
+      const stack = document.elementsFromPoint?.(x, y) ?? []
+      for (const node of stack) {
+        if (node.dataset?.bed !== undefined) return node
+        const p = node.closest?.('[data-bed]')
+        if (p) return p
+      }
+      // Запасной вариант: перебор всех ячеек через bounding rect
+      for (const c of document.querySelectorAll('[data-bed]')) {
+        const r = c.getBoundingClientRect()
+        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return c
+      }
+      return null
+    }
+
+    const onStart = (e) => {
+      const t = e.touches[0]
+      swipeRef.current = { dragging: true, startX: t.clientX, startY: t.clientY, offset: 0, moved: false }
+      setSwipeOffset(0)
+    }
+
+    const onMove = (e) => {
+      e.preventDefault()
+      const t = e.touches[0]
+
+      if (touchDragRef.current.active) {
+        // ── Режим переноса ────────────────────────────────────
+        const cellEl = findCell(t.clientX, t.clientY)
+        const target = cellEl
+          ? { bedIndex: +cellEl.dataset.bed, row: +cellEl.dataset.row, col: +cellEl.dataset.col }
+          : touchDragRef.current.target
+        touchDragRef.current = { ...touchDragRef.current, x: t.clientX, y: t.clientY, target }
+        setTouchDrag({ ...touchDragRef.current })
+
+        // Детекция края для смены грядки
+        const ab = activeBedRef.current
+        const nb = numBedsRef.current
+        const atLeft  = t.clientX < EDGE_W && ab > 0
+        const atRight = t.clientX > window.innerWidth - EDGE_W && ab < nb - 1
+        if (atLeft) {
+          setEdgeZone('left')
+          if (!edgeTimerRef.current) edgeTimerRef.current = setTimeout(() => {
+            const next = activeBedRef.current - 1
+            activeBedRef.current = next; setActiveBed(next)
+            touchDragRef.current = { ...touchDragRef.current, target: null }
+            setTouchDrag({ ...touchDragRef.current })
+            edgeTimerRef.current = null; setEdgeZone(null)
+          }, EDGE_DELAY)
+        } else if (atRight) {
+          setEdgeZone('right')
+          if (!edgeTimerRef.current) edgeTimerRef.current = setTimeout(() => {
+            const next = activeBedRef.current + 1
+            activeBedRef.current = next; setActiveBed(next)
+            touchDragRef.current = { ...touchDragRef.current, target: null }
+            setTouchDrag({ ...touchDragRef.current })
+            edgeTimerRef.current = null; setEdgeZone(null)
+          }, EDGE_DELAY)
+        } else {
+          clearTimeout(edgeTimerRef.current); edgeTimerRef.current = null; setEdgeZone(null)
+        }
+        return
+      }
+
+      // ── Режим свайпа ──────────────────────────────────────
+      if (!swipeRef.current.dragging) return
+      const dx = t.clientX - swipeRef.current.startX
+      const dy = t.clientY - swipeRef.current.startY
+      if (Math.sqrt(dx * dx + dy * dy) > 10) {
+        clearTimeout(longPressTimer.current)
+        swipeRef.current.moved = true
+      }
+      if (!swipeRef.current.moved) return
+      swipeRef.current.offset = dx
+      setSwipeOffset(dx)
+    }
+
+    const onEnd = () => {
+      clearTimeout(longPressTimer.current)
+      clearTimeout(edgeTimerRef.current)
+      edgeTimerRef.current = null; setEdgeZone(null)
+
+      const drag = touchDragRef.current
+      if (drag.active) {
+        if (drag.source && drag.target) {
+          const { source: s, target: tg } = drag
+          const isSelf = s.bedIndex === tg.bedIndex && s.row === tg.row && s.col === tg.col
+          if (!isSelf) onPlantMoveRef.current?.(s, tg)
+        }
+        const reset = { active: false, source: null, target: null, x: 0, y: 0, plant: null }
+        touchDragRef.current = reset; setTouchDrag({ ...reset })
+      } else {
+        const { offset } = swipeRef.current
+        const ab = activeBedRef.current, nb = numBedsRef.current
+        if (offset < -SWIPE_THR && ab < nb - 1) { activeBedRef.current = ab + 1; setActiveBed(ab + 1) }
+        else if (offset > SWIPE_THR && ab > 0)  { activeBedRef.current = ab - 1; setActiveBed(ab - 1) }
+      }
+      swipeRef.current = { dragging: false, startX: 0, startY: 0, offset: 0, moved: false }
+      setSwipeOffset(0)
+    }
+
+    el.addEventListener('touchstart',  onStart, { passive: false })
+    el.addEventListener('touchmove',   onMove,  { passive: false })
+    el.addEventListener('touchend',    onEnd,   { passive: true  })
+    el.addEventListener('touchcancel', onEnd,   { passive: true  })
     return () => {
       el.removeEventListener('touchstart',  onStart)
       el.removeEventListener('touchmove',   onMove)
       el.removeEventListener('touchend',    onEnd)
-      el.removeEventListener('touchcancel', onCancel)
+      el.removeEventListener('touchcancel', onEnd)
     }
-  }, [])
+  }, []) // Все переменные доступны через стабильные refs
 
   // ── Мобильный вид: горизонтальный слайдер ────────────────────────
   if (isMobile) {
