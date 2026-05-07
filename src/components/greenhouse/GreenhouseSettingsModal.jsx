@@ -3,9 +3,8 @@ import { createPortal } from 'react-dom'
 import Drawer from '../ui/Drawer'
 
 const TYPES = [
-  { value: 'polycarbonate', label: 'Поликарбонатная' },
-  { value: 'film',          label: 'Плёночная'        },
-  { value: 'glass',         label: 'Стеклянная'       },
+  { value: 'greenhouse', label: '🏠 Теплица' },
+  { value: 'outdoor',    label: '🌿 Уличная грядка' },
 ]
 
 function DeleteConfirm({ onConfirm, onClose }) {

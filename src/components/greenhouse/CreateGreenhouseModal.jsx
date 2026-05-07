@@ -5,12 +5,11 @@ import data from '@emoji-mart/data'
 import Drawer from '../ui/Drawer'
 
 const TYPES = [
-  { value: 'polycarbonate', label: 'Поликарбонатная' },
-  { value: 'film',          label: 'Плёночная' },
-  { value: 'glass',         label: 'Стеклянная' },
+  { value: 'greenhouse', label: '🏠 Теплица' },
+  { value: 'outdoor',    label: '🌿 Уличная грядка' },
 ]
 
-const DEFAULT = { name: '', description: '', type: 'polycarbonate', numBeds: 2 }
+const DEFAULT = { name: '', description: '', type: 'greenhouse', numBeds: 2 }
 
 const BED_OPTIONS = [
   { n: 1, label: 'грядка' },
