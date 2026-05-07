@@ -270,7 +270,11 @@ function MobileBed({ bedIndex, rows, cols, plants, onCellClick, onRowsChange, on
       </div>
 
       {/* Resize steppers */}
-      <div className="flex items-center justify-between mt-2.5 px-0.5">
+      <div
+        className="flex items-center justify-between mt-2.5 px-0.5"
+        onTouchStart={e => e.stopPropagation()}
+        style={{ touchAction: 'auto' }}
+      >
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-gray-400">Строк</span>
           <StepButton
