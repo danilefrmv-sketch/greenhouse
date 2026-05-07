@@ -483,23 +483,33 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
     setSwipeOffset(0)
   }, [setDrag])
 
-  // ── Non-passive touch listeners (нужно для e.preventDefault() на Android) ──
+  // ── Все touch-события нативно (React synthetic не надёжны на MIUI/Android) ──
   const sliderContainerRef = useRef(null)
-  const touchStartCbRef    = useRef(handleContainerTouchStart)
-  const touchMoveCbRef     = useRef(handleContainerTouchMove)
-  useEffect(() => { touchStartCbRef.current = handleContainerTouchStart }, [handleContainerTouchStart])
-  useEffect(() => { touchMoveCbRef.current  = handleContainerTouchMove  }, [handleContainerTouchMove])
+  const touchStartCbRef  = useRef(handleContainerTouchStart)
+  const touchMoveCbRef   = useRef(handleContainerTouchMove)
+  const touchEndCbRef    = useRef(handleContainerTouchEnd)
+  const touchCancelCbRef = useRef(handleContainerTouchCancel)
+  useEffect(() => { touchStartCbRef.current  = handleContainerTouchStart  }, [handleContainerTouchStart])
+  useEffect(() => { touchMoveCbRef.current   = handleContainerTouchMove   }, [handleContainerTouchMove])
+  useEffect(() => { touchEndCbRef.current    = handleContainerTouchEnd    }, [handleContainerTouchEnd])
+  useEffect(() => { touchCancelCbRef.current = handleContainerTouchCancel }, [handleContainerTouchCancel])
 
   useEffect(() => {
     const el = sliderContainerRef.current
     if (!el) return
     const onStart  = e => touchStartCbRef.current(e)
     const onMove   = e => { e.preventDefault(); touchMoveCbRef.current(e) }
-    el.addEventListener('touchstart', onStart, { passive: false })
-    el.addEventListener('touchmove',  onMove,  { passive: false })
+    const onEnd    = e => touchEndCbRef.current(e)
+    const onCancel = e => touchCancelCbRef.current(e)
+    el.addEventListener('touchstart',  onStart,  { passive: false })
+    el.addEventListener('touchmove',   onMove,   { passive: false })
+    el.addEventListener('touchend',    onEnd,    { passive: true  })
+    el.addEventListener('touchcancel', onCancel, { passive: true  })
     return () => {
-      el.removeEventListener('touchstart', onStart)
-      el.removeEventListener('touchmove',  onMove)
+      el.removeEventListener('touchstart',  onStart)
+      el.removeEventListener('touchmove',   onMove)
+      el.removeEventListener('touchend',    onEnd)
+      el.removeEventListener('touchcancel', onCancel)
     }
   }, [])
 
@@ -534,8 +544,6 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
           ref={sliderContainerRef}
           className="overflow-hidden"
           style={{ touchAction: 'none' }}
-          onTouchEnd={handleContainerTouchEnd}
-          onTouchCancel={handleContainerTouchCancel}
           onContextMenu={e => e.preventDefault()}
         >
           <div
