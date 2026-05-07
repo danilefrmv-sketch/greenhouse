@@ -168,9 +168,8 @@ function DayCard({ date, phase, label }) {
       {hover && (
         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-20
           bg-gray-900 text-white text-sm leading-snug rounded-xl px-3 py-2
-          whitespace-normal text-center max-w-[280px] pointer-events-none shadow-lg">
+          w-max max-w-[320px] text-center pointer-events-none shadow-lg">
           {phase.tip}
-          {/* стрелка */}
           <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
         </div>
       )}
