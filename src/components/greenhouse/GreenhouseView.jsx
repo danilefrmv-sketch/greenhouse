@@ -355,12 +355,18 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
   const handleDragEnd   = () => { setDragSource(null); setDragTarget(null) }
 
   // ── Touch drag state ──────────────────────────────────────────────
-  const [touchDrag, setTouchDrag] = useState({ active: false, source: null, target: null, x: 0, y: 0, plant: null })
-  const touchDragRef   = useRef(touchDrag)
+  // touchDragRef — источник правды, обновляется СИНХРОННО
+  // touchDrag    — только для рендера
+  const DRAG_RESET = { active: false, source: null, target: null, x: 0, y: 0, plant: null }
+  const touchDragRef   = useRef(DRAG_RESET)
+  const [touchDrag, setTouchDrag] = useState(DRAG_RESET)
   const longPressTimer = useRef(null)
 
-  // Синхронизируем ref для чтения в коллбэках без stale closure
-  useEffect(() => { touchDragRef.current = touchDrag }, [touchDrag])
+  // Синхронное обновление ref + state
+  const setDrag = useCallback((next) => {
+    touchDragRef.current = next
+    setTouchDrag(next)
+  }, [])
 
   const handleTouchCellStart = useCallback((e, cell, plant) => {
     if (!plant) return
@@ -368,12 +374,11 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
     clearTimeout(longPressTimer.current)
     longPressTimer.current = setTimeout(() => {
       navigator.vibrate?.(60)
-      setTouchDrag({ active: true, source: cell, target: null, x: touch.clientX, y: touch.clientY, plant })
+      setDrag({ active: true, source: cell, target: null, x: touch.clientX, y: touch.clientY, plant })
     }, 450)
-    // Фиксируем старт свайпа (если long-press не сработает — будет свайп)
     swipeRef.current = { dragging: true, startX: touch.clientX, offset: 0 }
     setSwipeOffset(0)
-  }, [])
+  }, [setDrag])
 
   const handleContainerTouchStart = useCallback(e => {
     const touch = e.touches[0]
@@ -387,21 +392,18 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
     if (touchDragRef.current.active) {
       // ── Режим переноса растения ──────────────────────────────
       clearTimeout(longPressTimer.current)
-      e.preventDefault()
-      setTouchDrag(prev => ({ ...prev, x: touch.clientX, y: touch.clientY }))
 
-      const el    = document.elementFromPoint(touch.clientX, touch.clientY)
+      // Ищем ячейку под пальцем
+      const el     = document.elementFromPoint(touch.clientX, touch.clientY)
       const cellEl = el?.closest('[data-bed]')
-      if (cellEl) {
-        setTouchDrag(prev => ({
-          ...prev,
-          target: {
-            bedIndex: parseInt(cellEl.dataset.bed),
-            row:      parseInt(cellEl.dataset.row),
-            col:      parseInt(cellEl.dataset.col),
-          }
-        }))
-      }
+      const target = cellEl ? {
+        bedIndex: parseInt(cellEl.dataset.bed),
+        row:      parseInt(cellEl.dataset.row),
+        col:      parseInt(cellEl.dataset.col),
+      } : touchDragRef.current.target
+
+      // Синхронно обновляем ref и state
+      setDrag({ ...touchDragRef.current, x: touch.clientX, y: touch.clientY, target })
 
       // Детекция края → смена грядки
       const sw = window.innerWidth
@@ -413,7 +415,7 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
         if (!edgeTimerRef.current) {
           edgeTimerRef.current = setTimeout(() => {
             switchBed(activeBedRef.current - 1)
-            setTouchDrag(p => ({ ...p, target: null }))
+            setDrag({ ...touchDragRef.current, target: null })
             edgeTimerRef.current = null
             setEdgeZone(null)
           }, EDGE_DELAY)
@@ -423,7 +425,7 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
         if (!edgeTimerRef.current) {
           edgeTimerRef.current = setTimeout(() => {
             switchBed(activeBedRef.current + 1)
-            setTouchDrag(p => ({ ...p, target: null }))
+            setDrag({ ...touchDragRef.current, target: null })
             edgeTimerRef.current = null
             setEdgeZone(null)
           }, EDGE_DELAY)
@@ -442,7 +444,7 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
     const offset = touch.clientX - swipeRef.current.startX
     swipeRef.current.offset = offset
     setSwipeOffset(offset)
-  }, [numBeds, switchBed])
+  }, [numBeds, switchBed, setDrag])
 
   const handleContainerTouchEnd = useCallback(() => {
     clearTimeout(longPressTimer.current)
@@ -450,17 +452,15 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
     edgeTimerRef.current = null
     setEdgeZone(null)
 
-    if (touchDragRef.current.active) {
-      setTouchDrag(prev => {
-        if (prev.source && prev.target) {
-          const { source, target } = prev
-          const isSelf = source.bedIndex === target.bedIndex && source.row === target.row && source.col === target.col
-          if (!isSelf) onPlantMove?.(source, target)
-        }
-        return { active: false, source: null, target: null, x: 0, y: 0, plant: null }
-      })
+    const drag = touchDragRef.current  // всегда актуален (синхронный)
+    if (drag.active) {
+      if (drag.source && drag.target) {
+        const { source, target } = drag
+        const isSelf = source.bedIndex === target.bedIndex && source.row === target.row && source.col === target.col
+        if (!isSelf) onPlantMove?.(source, target)
+      }
+      setDrag(DRAG_RESET)
     } else {
-      // Завершение свайпа → переключаем грядку если превышен порог
       const { offset } = swipeRef.current
       if (offset < -SWIPE_THR && activeBedRef.current < numBeds - 1) {
         switchBed(activeBedRef.current + 1)
@@ -471,17 +471,17 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
 
     swipeRef.current = { dragging: false, startX: 0, offset: 0 }
     setSwipeOffset(0)
-  }, [onPlantMove, numBeds, switchBed])
+  }, [onPlantMove, numBeds, switchBed, setDrag])
 
   const handleContainerTouchCancel = useCallback(() => {
     clearTimeout(longPressTimer.current)
     clearTimeout(edgeTimerRef.current)
     edgeTimerRef.current = null
     setEdgeZone(null)
-    setTouchDrag({ active: false, source: null, target: null, x: 0, y: 0, plant: null })
+    setDrag(DRAG_RESET)
     swipeRef.current = { dragging: false, startX: 0, offset: 0 }
     setSwipeOffset(0)
-  }, [])
+  }, [setDrag])
 
   // ── Non-passive touch listeners (нужно для e.preventDefault() на Android) ──
   const sliderContainerRef = useRef(null)
