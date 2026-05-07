@@ -361,12 +361,18 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
   const prevTargetEl   = useRef(null)   // DOM-элемент подсвеченной ячейки-цели
 
   // Refs для пропов — нужны внутри нативных обработчиков (stable closure)
-  const numBedsRef     = useRef(numBeds)
-  const onPlantMoveRef = useRef(onPlantMove)
-  const plantsRef      = useRef(plants)
-  useEffect(() => { numBedsRef.current     = numBeds    }, [numBeds])
+  const numBedsRef      = useRef(numBeds)
+  const onPlantMoveRef  = useRef(onPlantMove)
+  const plantsRef       = useRef(plants)
+  const onCellClickRef  = useRef(onCellClick)
+  useEffect(() => { numBedsRef.current     = numBeds     }, [numBeds])
   useEffect(() => { onPlantMoveRef.current = onPlantMove }, [onPlantMove])
-  useEffect(() => { plantsRef.current      = plants      }, [plants])
+  useEffect(() => { plantsRef.current      = plants       }, [plants])
+  useEffect(() => { onCellClickRef.current = onCellClick  }, [onCellClick])
+
+  // Для ручной обработки тапов (e.preventDefault на touchstart убивает синтетические клики)
+  const touchStartCellRef = useRef(null)
+  const touchStartTimeRef = useRef(0)
 
   // Заглушка — long-press теперь полностью в нативном обработчике
   const handleTouchCellStart = useCallback(() => {}, [])
@@ -394,7 +400,15 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
     }
 
     const onStart = (e) => {
+      // preventDefault здесь — ключ к работе на MIUI Chrome:
+      // без него браузер перехватывает long-press (показывает своё меню)
+      // и бросает touchcancel до того, как наш таймер срабатывает.
+      // Синтетические onClick после этого не стреляют — обрабатываем тапы вручную в onEnd.
+      e.preventDefault()
+
       const t = e.touches[0]
+      touchStartTimeRef.current = Date.now()
+      touchStartCellRef.current = null
       swipeRef.current = { dragging: true, startX: t.clientX, startY: t.clientY, offset: 0, moved: false }
       setSwipeOffset(0)
 
@@ -404,6 +418,7 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
         const bed = +cellEl.dataset.bed
         const row = +cellEl.dataset.row
         const col = +cellEl.dataset.col
+        touchStartCellRef.current = { bedIndex: bed, row, col }
         const plant = plantsRef.current.find(
           p => p.bedIndex === bed && p.row === row && p.col === col
         )
@@ -528,11 +543,19 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
         const reset = { active: false, source: null, target: null, x: 0, y: 0, plant: null }
         touchDragRef.current = reset; setTouchDrag({ ...reset })
       } else {
-        const { offset } = swipeRef.current
-        const ab = activeBedRef.current, nb = numBedsRef.current
-        if (offset < -SWIPE_THR && ab < nb - 1) { activeBedRef.current = ab + 1; setActiveBed(ab + 1) }
-        else if (offset > SWIPE_THR && ab > 0)  { activeBedRef.current = ab - 1; setActiveBed(ab - 1) }
+        const { offset, moved } = swipeRef.current
+        const elapsed = Date.now() - touchStartTimeRef.current
+        // Тап: палец почти не двигался и отпустили быстро → эмулируем клик
+        if (!moved && elapsed < 350 && touchStartCellRef.current) {
+          onCellClickRef.current?.(touchStartCellRef.current)
+        } else {
+          // Свайп для смены грядки
+          const ab = activeBedRef.current, nb = numBedsRef.current
+          if (offset < -SWIPE_THR && ab < nb - 1) { activeBedRef.current = ab + 1; setActiveBed(ab + 1) }
+          else if (offset > SWIPE_THR && ab > 0)  { activeBedRef.current = ab - 1; setActiveBed(ab - 1) }
+        }
       }
+      touchStartCellRef.current = null
       swipeRef.current = { dragging: false, startX: 0, startY: 0, offset: 0, moved: false }
       setSwipeOffset(0)
     }
