@@ -727,28 +727,33 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
           </>
         )}
 
-        {/* Контролы размера — вне слайдера, скроллируются со страницей */}
         {!touchDrag.active && (
-          <BedSizeControls
-            bedIndex={activeBed}
-            rows={bedStates[activeBed].rows}
-            cols={bedStates[activeBed].cols}
-            plants={plants}
-            rowSide={rowSide}
-            colSide={colSide}
-            onRowSideChange={setRowSide}
-            onColSideChange={setColSide}
-            onRowsChange={v => updateBed(activeBed, 'rows', v)}
-            onColsChange={v => updateBed(activeBed, 'cols', v)}
-            onShiftRows={delta => onShiftRows?.(activeBed, delta)}
-            onShiftCols={delta => onShiftCols?.(activeBed, delta)}
-          />
-        )}
-
-        {!touchDrag.active && (
-          <p className="text-center text-sm text-gray-400 mt-3">
+          <p className="text-center text-sm text-gray-400 mt-3 mb-24">
             {numBeds > 1 ? 'Свайп для смены грядки · удержание для переноса растения' : 'Удерживайте ячейку чтобы переместить растение'}
           </p>
+        )}
+
+        {/* Фиксированный бар контролов внизу экрана — всегда доступен */}
+        {!touchDrag.active && (
+          <div
+            className="fixed bottom-0 left-0 right-0 z-20 bg-white/95 backdrop-blur border-t border-gray-100 px-4 pt-3"
+            style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
+          >
+            <BedSizeControls
+              bedIndex={activeBed}
+              rows={bedStates[activeBed].rows}
+              cols={bedStates[activeBed].cols}
+              plants={plants}
+              rowSide={rowSide}
+              colSide={colSide}
+              onRowSideChange={setRowSide}
+              onColSideChange={setColSide}
+              onRowsChange={v => updateBed(activeBed, 'rows', v)}
+              onColsChange={v => updateBed(activeBed, 'cols', v)}
+              onShiftRows={delta => onShiftRows?.(activeBed, delta)}
+              onShiftCols={delta => onShiftCols?.(activeBed, delta)}
+            />
+          </div>
         )}
       </div>
     )
