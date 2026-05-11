@@ -78,6 +78,12 @@ export default function GreenhousePage() {
     setDiaryModal(prev => ({ ...prev, plant: updated }))
   }
 
+  const handleBedLayoutsChange = (layouts) => {
+    const next = { ...meta, bedLayouts: layouts }
+    setMeta(next)
+    saveMeta(id, next)
+  }
+
   const handleSaveSettings = ({ name, description, type }) => {
     const next = { ...meta, name, description, type }
     setMeta(next)
@@ -137,6 +143,7 @@ export default function GreenhousePage() {
           onCellClick={handleCellClick}
           onPlantMove={handlePlantMove}
           onShiftRows={handleShiftPlantRows}
+          onBedLayoutsChange={handleBedLayoutsChange}
         />
       </main>
 

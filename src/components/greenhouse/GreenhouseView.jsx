@@ -306,16 +306,17 @@ function MobileBed({ bedIndex, rows, cols, plants, onCellClick, onRowsChange, on
 }
 
 // ─── GreenhouseView ───────────────────────────────────────────────────
-export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, onShiftRows }) {
+export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, onShiftRows, onBedLayoutsChange }) {
   const { numBeds, plants = [] } = greenhouse
   const isMobile = useIsMobile()
 
-  const [bedStates, setBedStates] = useState(
-    Array.from({ length: numBeds }, () => ({
-      rows: greenhouse.numRows ?? 6,
-      cols: 2,
-    }))
-  )
+  const [bedStates, setBedStates] = useState(() => {
+    // Восстанавливаем сохранённые размеры грядок, иначе — дефолт
+    const saved = greenhouse.bedLayouts
+    return Array.from({ length: numBeds }, (_, i) =>
+      saved?.[i] ?? { rows: greenhouse.numRows ?? 6, cols: 2 }
+    )
+  })
 
   const [activeBed,   setActiveBed]   = useState(0)
   const activeBedRef  = useRef(0)
@@ -337,7 +338,11 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
   const [dragTarget, setDragTarget] = useState(null)
 
   const updateBed = (bedIndex, field, value) =>
-    setBedStates(prev => prev.map((s, i) => i === bedIndex ? { ...s, [field]: value } : s))
+    setBedStates(prev => {
+      const next = prev.map((s, i) => i === bedIndex ? { ...s, [field]: value } : s)
+      onBedLayoutsChange?.(next)
+      return next
+    })
 
   const handleDragStart = (cell) => setDragSource(cell)
   const handleDragOver  = (cell) => {
@@ -400,6 +405,10 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
     }
 
     const onStart = (e) => {
+      // Кнопки (степперы ±) пропускаем — они должны работать как обычные клики.
+      // Наш preventDefault убил бы синтетические onClick на них.
+      if (e.target.closest('button')) return
+
       // preventDefault здесь — ключ к работе на MIUI Chrome:
       // без него браузер перехватывает long-press (показывает своё меню)
       // и бросает touchcancel до того, как наш таймер срабатывает.
