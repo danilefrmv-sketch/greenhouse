@@ -226,7 +226,7 @@ function StepButton({ onClick, disabled, children }) {
   )
 }
 
-function MobileBed({ bedIndex, rows, cols, plants, onCellClick, onRowsChange, onColsChange, dragSource, dragTarget, onTouchCellStart }) {
+function MobileBed({ bedIndex, rows, cols, plants, onCellClick, onRowsChange, onColsChange, onShiftRows, onShiftCols, dragSource, dragTarget, onTouchCellStart }) {
   const getPlant = (row, col) =>
     plants.find(p => p.bedIndex === bedIndex && p.row === row && p.col === col) ?? null
 
@@ -275,30 +275,50 @@ function MobileBed({ bedIndex, rows, cols, plants, onCellClick, onRowsChange, on
         onTouchStart={e => e.stopPropagation()}
         style={{ touchAction: 'auto' }}
       >
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-gray-400">Строк</span>
+        {/* ── Строки ── */}
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-gray-400 mr-0.5">Строк</span>
+          {/* Убрать строку снизу */}
           <StepButton
             onClick={() => onRowsChange(Math.max(effectiveMinRows, rows - 1))}
             disabled={rows <= effectiveMinRows}
           >−</StepButton>
           <span className="text-sm font-semibold text-gray-600 w-4 text-center">{rows}</span>
+          {/* Добавить строку сверху */}
+          <StepButton
+            onClick={() => { onRowsChange(Math.min(MAX_ROWS, rows + 1)); onShiftRows?.(1) }}
+            disabled={rows >= MAX_ROWS}
+            title="Добавить сверху"
+          >↑</StepButton>
+          {/* Добавить строку снизу */}
           <StepButton
             onClick={() => onRowsChange(Math.min(MAX_ROWS, rows + 1))}
             disabled={rows >= MAX_ROWS}
-          >+</StepButton>
+            title="Добавить снизу"
+          >↓</StepButton>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-gray-400">Столбцов</span>
+        {/* ── Столбцы ── */}
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-gray-400 mr-0.5">Столбцов</span>
+          {/* Убрать столбец справа */}
           <StepButton
             onClick={() => onColsChange(Math.max(effectiveMinCols, cols - 1))}
             disabled={cols <= effectiveMinCols}
           >−</StepButton>
-          <span className="text-sm font-semibold text-gray-600 w-5 text-center">{cols}</span>
+          <span className="text-sm font-semibold text-gray-600 w-4 text-center">{cols}</span>
+          {/* Добавить столбец слева */}
+          <StepButton
+            onClick={() => { onColsChange(Math.min(MAX_COLS, cols + 1)); onShiftCols?.(1) }}
+            disabled={cols >= MAX_COLS}
+            title="Добавить слева"
+          >←</StepButton>
+          {/* Добавить столбец справа */}
           <StepButton
             onClick={() => onColsChange(Math.min(MAX_COLS, cols + 1))}
             disabled={cols >= MAX_COLS}
-          >+</StepButton>
+            title="Добавить справа"
+          >→</StepButton>
         </div>
       </div>
     </div>
@@ -306,7 +326,7 @@ function MobileBed({ bedIndex, rows, cols, plants, onCellClick, onRowsChange, on
 }
 
 // ─── GreenhouseView ───────────────────────────────────────────────────
-export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, onShiftRows, onBedLayoutsChange }) {
+export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, onShiftRows, onShiftCols, onBedLayoutsChange }) {
   const { numBeds, plants = [] } = greenhouse
   const isMobile = useIsMobile()
 
@@ -632,6 +652,8 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
                   onCellClick={onCellClick}
                   onRowsChange={v => updateBed(i, 'rows', v)}
                   onColsChange={v => updateBed(i, 'cols', v)}
+                  onShiftRows={delta => onShiftRows?.(i, delta)}
+                  onShiftCols={delta => onShiftCols?.(i, delta)}
                   dragSource={touchDrag.active ? touchDrag.source : null}
                   dragTarget={touchDrag.active ? touchDrag.target : null}
                   onTouchCellStart={handleTouchCellStart}

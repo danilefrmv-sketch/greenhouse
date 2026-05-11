@@ -69,6 +69,12 @@ export default function GreenhousePage() {
     ))
   }
 
+  const handleShiftPlantCols = (bedIndex, delta) => {
+    mutatePlants(prev => prev.map(p =>
+      p.bedIndex === bedIndex ? { ...p, col: Math.max(0, p.col + delta) } : p
+    ))
+  }
+
   const handleHarvestPlant = plant => {
     mutatePlants(prev => applyHarvestPlant(prev, plant.id))
   }
@@ -143,6 +149,7 @@ export default function GreenhousePage() {
           onCellClick={handleCellClick}
           onPlantMove={handlePlantMove}
           onShiftRows={handleShiftPlantRows}
+          onShiftCols={handleShiftPlantCols}
           onBedLayoutsChange={handleBedLayoutsChange}
         />
       </main>
