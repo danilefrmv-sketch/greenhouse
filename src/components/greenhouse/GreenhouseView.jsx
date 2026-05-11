@@ -226,15 +226,73 @@ function StepButton({ onClick, disabled, children }) {
   )
 }
 
+// Пикер стороны: два варианта, активный подсвечен
+function SidePicker({ a, b, value, onChange }) {
+  return (
+    <div className="flex rounded-lg overflow-hidden border border-gray-200 text-xs shrink-0">
+      <button
+        type="button"
+        onClick={() => onChange(a.value)}
+        className={`w-7 h-7 flex items-center justify-center transition-colors ${
+          value === a.value ? 'bg-green-500 text-white' : 'text-gray-400 hover:bg-gray-50'
+        }`}
+      >{a.label}</button>
+      <button
+        type="button"
+        onClick={() => onChange(b.value)}
+        className={`w-7 h-7 flex items-center justify-center border-l border-gray-200 transition-colors ${
+          value === b.value ? 'bg-green-500 text-white' : 'text-gray-400 hover:bg-gray-50'
+        }`}
+      >{b.label}</button>
+    </div>
+  )
+}
+
 function MobileBed({ bedIndex, rows, cols, plants, onCellClick, onRowsChange, onColsChange, onShiftRows, onShiftCols, dragSource, dragTarget, onTouchCellStart }) {
+  const [rowSide, setRowSide] = useState('bottom')  // 'top' | 'bottom'
+  const [colSide, setColSide] = useState('right')   // 'left' | 'right'
+
   const getPlant = (row, col) =>
     plants.find(p => p.bedIndex === bedIndex && p.row === row && p.col === col) ?? null
 
   const bedPlants      = plants.filter(p => p.bedIndex === bedIndex)
   const maxOccupiedRow = bedPlants.length > 0 ? Math.max(...bedPlants.map(p => p.row)) : -1
   const maxOccupiedCol = bedPlants.length > 0 ? Math.max(...bedPlants.map(p => p.col)) : -1
-  const effectiveMinRows = Math.max(MIN_ROWS, maxOccupiedRow + 1)
-  const effectiveMinCols = Math.max(MIN_COLS, maxOccupiedCol + 1)
+  const minOccupiedRow = bedPlants.length > 0 ? Math.min(...bedPlants.map(p => p.row)) : rows
+  const minOccupiedCol = bedPlants.length > 0 ? Math.min(...bedPlants.map(p => p.col)) : cols
+
+  // Ограничения зависят от выбранной стороны
+  const canAddRow    = rows < MAX_ROWS
+  const canRemoveRow = rowSide === 'bottom'
+    ? rows > MIN_ROWS && rows > maxOccupiedRow + 1   // нижняя строка пуста
+    : rows > MIN_ROWS && minOccupiedRow > 0           // верхняя строка пуста
+
+  const canAddCol    = cols < MAX_COLS
+  const canRemoveCol = colSide === 'right'
+    ? cols > MIN_COLS && cols > maxOccupiedCol + 1
+    : cols > MIN_COLS && minOccupiedCol > 0
+
+  const handleAddRow = () => {
+    if (!canAddRow) return
+    onRowsChange(rows + 1)
+    if (rowSide === 'top') onShiftRows?.(1)
+  }
+  const handleRemoveRow = () => {
+    if (!canRemoveRow) return
+    onRowsChange(rows - 1)
+    if (rowSide === 'top') onShiftRows?.(-1)
+  }
+
+  const handleAddCol = () => {
+    if (!canAddCol) return
+    onColsChange(cols + 1)
+    if (colSide === 'left') onShiftCols?.(1)
+  }
+  const handleRemoveCol = () => {
+    if (!canRemoveCol) return
+    onColsChange(cols - 1)
+    if (colSide === 'left') onShiftCols?.(-1)
+  }
 
   return (
     <div>
@@ -276,49 +334,31 @@ function MobileBed({ bedIndex, rows, cols, plants, onCellClick, onRowsChange, on
         style={{ touchAction: 'auto' }}
       >
         {/* ── Строки ── */}
-        <div className="flex items-center gap-1">
-          <span className="text-xs text-gray-400 mr-0.5">Строк</span>
-          {/* Убрать строку снизу */}
-          <StepButton
-            onClick={() => onRowsChange(Math.max(effectiveMinRows, rows - 1))}
-            disabled={rows <= effectiveMinRows}
-          >−</StepButton>
+        <div className="flex items-center gap-1.5">
+          <SidePicker
+            a={{ value: 'top',    label: '↑' }}
+            b={{ value: 'bottom', label: '↓' }}
+            value={rowSide}
+            onChange={setRowSide}
+          />
+          <span className="text-xs text-gray-400">Строк</span>
+          <StepButton onClick={handleRemoveRow} disabled={!canRemoveRow}>−</StepButton>
           <span className="text-sm font-semibold text-gray-600 w-4 text-center">{rows}</span>
-          {/* Добавить строку сверху */}
-          <StepButton
-            onClick={() => { onRowsChange(Math.min(MAX_ROWS, rows + 1)); onShiftRows?.(1) }}
-            disabled={rows >= MAX_ROWS}
-            title="Добавить сверху"
-          >↑</StepButton>
-          {/* Добавить строку снизу */}
-          <StepButton
-            onClick={() => onRowsChange(Math.min(MAX_ROWS, rows + 1))}
-            disabled={rows >= MAX_ROWS}
-            title="Добавить снизу"
-          >↓</StepButton>
+          <StepButton onClick={handleAddRow} disabled={!canAddRow}>+</StepButton>
         </div>
 
         {/* ── Столбцы ── */}
-        <div className="flex items-center gap-1">
-          <span className="text-xs text-gray-400 mr-0.5">Столбцов</span>
-          {/* Убрать столбец справа */}
-          <StepButton
-            onClick={() => onColsChange(Math.max(effectiveMinCols, cols - 1))}
-            disabled={cols <= effectiveMinCols}
-          >−</StepButton>
+        <div className="flex items-center gap-1.5">
+          <SidePicker
+            a={{ value: 'left',  label: '←' }}
+            b={{ value: 'right', label: '→' }}
+            value={colSide}
+            onChange={setColSide}
+          />
+          <span className="text-xs text-gray-400">Столбцов</span>
+          <StepButton onClick={handleRemoveCol} disabled={!canRemoveCol}>−</StepButton>
           <span className="text-sm font-semibold text-gray-600 w-4 text-center">{cols}</span>
-          {/* Добавить столбец слева */}
-          <StepButton
-            onClick={() => { onColsChange(Math.min(MAX_COLS, cols + 1)); onShiftCols?.(1) }}
-            disabled={cols >= MAX_COLS}
-            title="Добавить слева"
-          >←</StepButton>
-          {/* Добавить столбец справа */}
-          <StepButton
-            onClick={() => onColsChange(Math.min(MAX_COLS, cols + 1))}
-            disabled={cols >= MAX_COLS}
-            title="Добавить справа"
-          >→</StepButton>
+          <StepButton onClick={handleAddCol} disabled={!canAddCol}>+</StepButton>
         </div>
       </div>
     </div>
