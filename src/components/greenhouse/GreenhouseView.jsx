@@ -446,15 +446,8 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
     }
 
     const onStart = (e) => {
-      // Кнопки (степперы ±) пропускаем — они должны работать как обычные клики.
-      // Наш preventDefault убил бы синтетические onClick на них.
+      // Кнопки (степперы ±) пропускаем
       if (e.target.closest('button')) return
-
-      // preventDefault здесь — ключ к работе на MIUI Chrome:
-      // без него браузер перехватывает long-press (показывает своё меню)
-      // и бросает touchcancel до того, как наш таймер срабатывает.
-      // Синтетические onClick после этого не стреляют — обрабатываем тапы вручную в onEnd.
-      e.preventDefault()
 
       const t = e.touches[0]
       touchStartTimeRef.current = Date.now()
@@ -462,7 +455,6 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
       swipeRef.current = { dragging: true, startX: t.clientX, startY: t.clientY, offset: 0, moved: false }
       setSwipeOffset(0)
 
-      // Long-press нативно — не зависим от React synthetic events
       const cellEl = findCell(t.clientX, t.clientY)
       if (cellEl) {
         const bed = +cellEl.dataset.bed
@@ -473,6 +465,9 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
           p => p.bedIndex === bed && p.row === row && p.col === col
         )
         if (plant) {
+          // preventDefault только для ячеек с растением — блокирует контекстное меню MIUI
+          // для пустых ячеек и фона — не блокируем, чтобы скролл работал
+          e.preventDefault()
           clearTimeout(longPressTimer.current)
           longPressTimer.current = setTimeout(() => {
             navigator.vibrate?.(60)
@@ -485,10 +480,10 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
     }
 
     const onMove = (e) => {
-      e.preventDefault()
       const t = e.touches[0]
 
       if (touchDragRef.current.active) {
+        e.preventDefault() // Во время drag — блокируем скролл полностью
         // ── Режим переноса ────────────────────────────────────
         const cellEl = findCell(t.clientX, t.clientY)
 
@@ -567,6 +562,9 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
         swipeRef.current.moved = true
       }
       if (!swipeRef.current.moved) return
+      // Только горизонтальный свайп обрабатываем — вертикаль отдаём браузеру (скролл)
+      if (Math.abs(dx) <= Math.abs(dy)) return
+      e.preventDefault()
       swipeRef.current.offset = dx
       setSwipeOffset(dx)
     }
@@ -652,7 +650,7 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
         <div
           ref={sliderContainerRef}
           className="overflow-hidden"
-          style={{ touchAction: 'none' }}
+          style={{ touchAction: 'pan-y' }}
           onContextMenu={e => e.preventDefault()}
         >
           <div
@@ -664,7 +662,7 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
             }}
           >
             {bedStates.map((state, i) => (
-              <div key={i} className="w-full shrink-0 pb-24">
+              <div key={i} className="w-full shrink-0 pb-28">
                 <MobileBed
                   bedIndex={i}
                   rows={state.rows}
