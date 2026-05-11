@@ -110,7 +110,6 @@ export default function CreateGreenhouseModal({ open, onClose, onCreate }) {
                 onChange={e => set('name', e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), descRef.current?.focus())}
                 enterKeyHint="next"
-                autoFocus
               />
               <button
                 type="button"

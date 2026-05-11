@@ -125,7 +125,6 @@ export default function GreenhouseSettingsModal({ open, onClose, greenhouse, onS
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="Название теплицы"
-              autoFocus
             />
           </div>
 

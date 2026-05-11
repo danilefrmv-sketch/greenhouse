@@ -373,7 +373,6 @@ function EditPlantForm({ plant, onSave, onCancel }) {
           onChange={e => setPlantName(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), dateRef.current?.focus())}
           enterKeyHint="next"
-          autoFocus
         />
         <input
           ref={dateRef}
