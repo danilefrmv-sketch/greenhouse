@@ -248,118 +248,95 @@ function SidePicker({ a, b, value, onChange }) {
   )
 }
 
-function MobileBed({ bedIndex, rows, cols, plants, onCellClick, onRowsChange, onColsChange, onShiftRows, onShiftCols, dragSource, dragTarget, onTouchCellStart }) {
-  const [rowSide, setRowSide] = useState('bottom')  // 'top' | 'bottom'
-  const [colSide, setColSide] = useState('right')   // 'left' | 'right'
-
+// Только сетка ячеек, без контролов — контролы рендерятся снаружи слайдера
+function MobileBed({ bedIndex, rows, cols, plants, onCellClick, dragSource, dragTarget, onTouchCellStart }) {
   const getPlant = (row, col) =>
     plants.find(p => p.bedIndex === bedIndex && p.row === row && p.col === col) ?? null
 
+  return (
+    <div className="bg-green-50 border border-green-200 rounded-2xl overflow-hidden" style={{ padding: BED_PAD }}>
+      <div className="flex flex-col items-center" style={{ gap: GAP_M }}>
+        {Array.from({ length: rows }, (_, row) => (
+          <div key={row} className="flex justify-center" style={{ gap: GAP_M }}>
+            {Array.from({ length: cols }, (_, col) => {
+              const plant   = getPlant(row, col)
+              const isSrc   = dragSource?.bedIndex === bedIndex && dragSource?.row === row && dragSource?.col === col
+              const isTgt   = dragTarget?.bedIndex === bedIndex && dragTarget?.row === row && dragTarget?.col === col
+              const tgtType = isTgt ? (plant ? 'swap' : 'empty') : null
+              return (
+                <div
+                  key={col}
+                  data-bed={bedIndex} data-row={row} data-col={col}
+                  style={{ width: CELL_M, height: CELL_M, flexShrink: 0 }}
+                >
+                  <PlantCell
+                    plant={plant}
+                    isDragSource={isSrc}
+                    isDragTarget={isTgt}
+                    dragTargetType={tgtType}
+                    onClick={() => !dragSource && onCellClick?.({ bedIndex, row, col })}
+                    onTouchStart={e => onTouchCellStart?.(e, { bedIndex, row, col }, plant)}
+                  />
+                </div>
+              )
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Контролы изменения размера — вынесены за слайдер, всегда доступны при скролле
+function BedSizeControls({ rows, cols, plants, bedIndex, rowSide, colSide, onRowSideChange, onColSideChange, onRowsChange, onColsChange, onShiftRows, onShiftCols }) {
   const bedPlants      = plants.filter(p => p.bedIndex === bedIndex)
   const maxOccupiedRow = bedPlants.length > 0 ? Math.max(...bedPlants.map(p => p.row)) : -1
   const maxOccupiedCol = bedPlants.length > 0 ? Math.max(...bedPlants.map(p => p.col)) : -1
   const minOccupiedRow = bedPlants.length > 0 ? Math.min(...bedPlants.map(p => p.row)) : rows
   const minOccupiedCol = bedPlants.length > 0 ? Math.min(...bedPlants.map(p => p.col)) : cols
 
-  // Ограничения зависят от выбранной стороны
   const canAddRow    = rows < MAX_ROWS
   const canRemoveRow = rowSide === 'bottom'
-    ? rows > MIN_ROWS && rows > maxOccupiedRow + 1   // нижняя строка пуста
-    : rows > MIN_ROWS && minOccupiedRow > 0           // верхняя строка пуста
+    ? rows > MIN_ROWS && rows > maxOccupiedRow + 1
+    : rows > MIN_ROWS && minOccupiedRow > 0
 
   const canAddCol    = cols < MAX_COLS
   const canRemoveCol = colSide === 'right'
     ? cols > MIN_COLS && cols > maxOccupiedCol + 1
     : cols > MIN_COLS && minOccupiedCol > 0
 
-  const handleAddRow = () => {
-    if (!canAddRow) return
-    onRowsChange(rows + 1)
-    if (rowSide === 'top') onShiftRows?.(1)
-  }
-  const handleRemoveRow = () => {
-    if (!canRemoveRow) return
-    onRowsChange(rows - 1)
-    if (rowSide === 'top') onShiftRows?.(-1)
-  }
-
-  const handleAddCol = () => {
-    if (!canAddCol) return
-    onColsChange(cols + 1)
-    if (colSide === 'left') onShiftCols?.(1)
-  }
-  const handleRemoveCol = () => {
-    if (!canRemoveCol) return
-    onColsChange(cols - 1)
-    if (colSide === 'left') onShiftCols?.(-1)
-  }
+  const handleAddRow    = () => { onRowsChange(rows + 1); if (rowSide === 'top') onShiftRows?.(1) }
+  const handleRemoveRow = () => { onRowsChange(rows - 1); if (rowSide === 'top') onShiftRows?.(-1) }
+  const handleAddCol    = () => { onColsChange(cols + 1); if (colSide === 'left') onShiftCols?.(1) }
+  const handleRemoveCol = () => { onColsChange(cols - 1); if (colSide === 'left') onShiftCols?.(-1) }
 
   return (
-    <div>
-      <div className="bg-green-50 border border-green-200 rounded-2xl overflow-hidden" style={{ padding: BED_PAD }}>
-        <div className="flex flex-col items-center" style={{ gap: GAP_M }}>
-          {Array.from({ length: rows }, (_, row) => (
-            <div key={row} className="flex justify-center" style={{ gap: GAP_M }}>
-              {Array.from({ length: cols }, (_, col) => {
-                const plant    = getPlant(row, col)
-                const isSrc    = dragSource?.bedIndex === bedIndex && dragSource?.row === row && dragSource?.col === col
-                const isTgt    = dragTarget?.bedIndex === bedIndex && dragTarget?.row === row && dragTarget?.col === col
-                const tgtType  = isTgt ? (plant ? 'swap' : 'empty') : null
-                return (
-                  <div
-                    key={col}
-                    data-bed={bedIndex} data-row={row} data-col={col}
-                    style={{ width: CELL_M, height: CELL_M, flexShrink: 0 }}
-                  >
-                    <PlantCell
-                      plant={plant}
-                      isDragSource={isSrc}
-                      isDragTarget={isTgt}
-                      dragTargetType={tgtType}
-                      onClick={() => !dragSource && onCellClick?.({ bedIndex, row, col })}
-                      onTouchStart={e => onTouchCellStart?.(e, { bedIndex, row, col }, plant)}
-                    />
-                  </div>
-                )
-              })}
-            </div>
-          ))}
-        </div>
+    <div className="flex flex-col gap-2 mt-3 px-1" style={{ touchAction: 'auto' }}>
+      {/* Строки */}
+      <div className="flex items-center gap-2">
+        <SidePicker
+          a={{ value: 'top',    label: '↑' }}
+          b={{ value: 'bottom', label: '↓' }}
+          value={rowSide}
+          onChange={onRowSideChange}
+        />
+        <span className="text-xs text-gray-400 w-14">Строк</span>
+        <StepButton onClick={handleRemoveRow} disabled={!canRemoveRow}>−</StepButton>
+        <span className="text-sm font-semibold text-gray-700 w-5 text-center">{rows}</span>
+        <StepButton onClick={handleAddRow} disabled={!canAddRow}>+</StepButton>
       </div>
-
-      {/* Resize steppers */}
-      <div
-        className="flex items-center justify-between mt-2.5 px-0.5"
-        onTouchStart={e => e.stopPropagation()}
-        style={{ touchAction: 'auto' }}
-      >
-        {/* ── Строки ── */}
-        <div className="flex items-center gap-1.5">
-          <SidePicker
-            a={{ value: 'top',    label: '↑' }}
-            b={{ value: 'bottom', label: '↓' }}
-            value={rowSide}
-            onChange={setRowSide}
-          />
-          <span className="text-xs text-gray-400">Строк</span>
-          <StepButton onClick={handleRemoveRow} disabled={!canRemoveRow}>−</StepButton>
-          <span className="text-sm font-semibold text-gray-600 w-4 text-center">{rows}</span>
-          <StepButton onClick={handleAddRow} disabled={!canAddRow}>+</StepButton>
-        </div>
-
-        {/* ── Столбцы ── */}
-        <div className="flex items-center gap-1.5">
-          <SidePicker
-            a={{ value: 'left',  label: '←' }}
-            b={{ value: 'right', label: '→' }}
-            value={colSide}
-            onChange={setColSide}
-          />
-          <span className="text-xs text-gray-400">Столбцов</span>
-          <StepButton onClick={handleRemoveCol} disabled={!canRemoveCol}>−</StepButton>
-          <span className="text-sm font-semibold text-gray-600 w-4 text-center">{cols}</span>
-          <StepButton onClick={handleAddCol} disabled={!canAddCol}>+</StepButton>
-        </div>
+      {/* Столбцы */}
+      <div className="flex items-center gap-2">
+        <SidePicker
+          a={{ value: 'left',  label: '←' }}
+          b={{ value: 'right', label: '→' }}
+          value={colSide}
+          onChange={onColSideChange}
+        />
+        <span className="text-xs text-gray-400 w-14">Столбцов</span>
+        <StepButton onClick={handleRemoveCol} disabled={!canRemoveCol}>−</StepButton>
+        <span className="text-sm font-semibold text-gray-700 w-5 text-center">{cols}</span>
+        <StepButton onClick={handleAddCol} disabled={!canAddCol}>+</StepButton>
       </div>
     </div>
   )
@@ -418,6 +395,10 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
   }
   const handleDragLeave = () => setDragTarget(null)
   const handleDragEnd   = () => { setDragSource(null); setDragTarget(null) }
+
+  // ── Стороны для контролов размера (вынесены из MobileBed) ────────────
+  const [rowSide, setRowSide] = useState('bottom')
+  const [colSide, setColSide] = useState('right')
 
   // ── Touch drag state ──────────────────────────────────────────────
   const touchDragRef   = useRef({ active: false, source: null, target: null, x: 0, y: 0, plant: null })
@@ -690,10 +671,6 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
                   cols={state.cols}
                   plants={plants}
                   onCellClick={onCellClick}
-                  onRowsChange={v => updateBed(i, 'rows', v)}
-                  onColsChange={v => updateBed(i, 'cols', v)}
-                  onShiftRows={delta => onShiftRows?.(i, delta)}
-                  onShiftCols={delta => onShiftCols?.(i, delta)}
                   dragSource={touchDrag.active ? touchDrag.source : null}
                   dragTarget={touchDrag.active ? touchDrag.target : null}
                   onTouchCellStart={handleTouchCellStart}
@@ -748,6 +725,24 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
               </div>
             )}
           </>
+        )}
+
+        {/* Контролы размера — вне слайдера, скроллируются со страницей */}
+        {!touchDrag.active && (
+          <BedSizeControls
+            bedIndex={activeBed}
+            rows={bedStates[activeBed].rows}
+            cols={bedStates[activeBed].cols}
+            plants={plants}
+            rowSide={rowSide}
+            colSide={colSide}
+            onRowSideChange={setRowSide}
+            onColSideChange={setColSide}
+            onRowsChange={v => updateBed(activeBed, 'rows', v)}
+            onColsChange={v => updateBed(activeBed, 'cols', v)}
+            onShiftRows={delta => onShiftRows?.(activeBed, delta)}
+            onShiftCols={delta => onShiftCols?.(activeBed, delta)}
+          />
         )}
 
         {!touchDrag.active && (
