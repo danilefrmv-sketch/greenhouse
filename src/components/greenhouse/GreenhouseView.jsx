@@ -664,7 +664,7 @@ export default function GreenhouseView({ greenhouse, onCellClick, onPlantMove, o
             }}
           >
             {bedStates.map((state, i) => (
-              <div key={i} className="w-full shrink-0">
+              <div key={i} className="w-full shrink-0 pb-24">
                 <MobileBed
                   bedIndex={i}
                   rows={state.rows}
